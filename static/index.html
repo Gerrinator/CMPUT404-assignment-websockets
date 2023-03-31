@@ -325,12 +325,19 @@ function update() {
     drawFrame();
 }
 
+firstFrame = true;
 
 function wsSetup() {
     var url = "ws://"+host+"/subscribe";   
     socket = new WebSocket(url);
     socket.onopen = function() {
         //XXX
+        // socket.send("init");
+        // var data = socket.receive();
+        // if (world != data){
+        //     world = data;
+        // }
+        // drawNextFrame();
 
         // alert("Connected!")
         // socket.send("Hello server!")
@@ -346,7 +353,7 @@ function wsSetup() {
             for (key in data) {
                 world[key] = data[key];
             }
-            drawNextFrame()
+            drawNextFrame();
 
         } catch (e) {
             alert("socket on message: " + e);
