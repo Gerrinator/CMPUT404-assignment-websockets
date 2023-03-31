@@ -17,7 +17,7 @@ import flask
 from flask import Flask, request, redirect
 from flask_sockets import Sockets
 import gevent
-from gevent import queue
+from gevent.queue import Queue
 import time
 import json
 import os
@@ -25,6 +25,18 @@ import os
 app = Flask(__name__)
 sockets = Sockets(app)
 app.debug = True
+
+# Taken from https://github.com/abramhindle/WebSocketsExamples/blob/master/chat.py
+clients = list()
+
+# Taken from https://github.com/abramhindle/WebSocketsExamples/blob/master/chat.py
+def send_all(msg):
+    for client in clients:
+        client.put(msg)
+
+# Taken from https://github.com/abramhindle/WebSocketsExamples/blob/master/chat.py
+def send_all_json(obj):
+    send_all(json.dumps(obj))
 
 class World:
     def __init__(self):
@@ -59,10 +71,29 @@ class World:
     def world(self):
         return self.space
 
+
+'''
+Based on Client class from https://github.com/abramhindle/WebSocketsExamples/blob/master/broadcaster.py
+'''
+class Client:
+    def __init__(self):
+        self.queue = Queue()
+
+    def put(self, v):
+        self.queue.put_nowait(v)
+
+    def get(self):
+        return self.queue.get()
+
+
 myWorld = World()        
 
 def set_listener( entity, data ):
     ''' do something with the update ! '''
+    json_data = {entity : data}
+    send_all_json(json_data)
+    
+
 
 myWorld.add_set_listener( set_listener )
         
@@ -71,18 +102,52 @@ def hello():
     '''Return something coherent here.. perhaps redirect to /static/index.html '''
     return redirect("/static/index.html")
 
+
+'''
+Partial implementation taken from https://github.com/abramhindle/WebSocketsExamples/blob/master/chat.pys
+'''
 def read_ws(ws,client):
     '''A greenlet function that reads from the websocket and updates the world'''
     # XXX: TODO IMPLEMENT ME
-    return None
+    try:
+        while True:
+            msg = ws.receive()
+            if (msg is not None):
+                packet = json.loads(msg)
+                for entity in packet.keys():
+                    myWorld.set(entity, packet[entity])
+            else:
+                break
+    except:
+        '''Done'''
 
+
+'''
+Partial implementation taken from https://github.com/abramhindle/WebSocketsExamples/blob/master/broadcaster.py
+'''
 @sockets.route('/subscribe')
 def subscribe_socket(ws):
     '''Fufill the websocket URL of /subscribe, every update notify the
        websocket and read updates from the websocket '''
     # XXX: TODO IMPLEMENT ME
-    return None
+    client = Client()
+    clients.append(client)
+    g = gevent.spawn(read_ws, ws, client)
+    try:
+        while True:
+            # ws.send(json.dumps(myWorld.world()))
+            msg = client.get()
+            ws.send(msg)
+    except Exception as e:
+        print("WS error %s" % e)
+    finally:
+        clients.remove(client)
+        gevent.kill(g)
 
+    
+    # message = ws.receive()
+    # print(message)
+    # ws.send("Hi websocket!")
 
 # I give this to you, this is how you get the raw body/data portion of a post in flask
 # this should come with flask but whatever, it's not my project.
