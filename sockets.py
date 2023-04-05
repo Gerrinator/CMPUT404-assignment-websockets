@@ -134,6 +134,11 @@ def subscribe_socket(ws):
     clients.append(client)
     g = gevent.spawn(read_ws, ws, client)
     try:
+        ws.send(json.dumps(myWorld.world()))
+    except Exception as e:
+        print("WS error %s" % e)
+
+    try:
         while True:
             # ws.send(json.dumps(myWorld.world()))
             msg = client.get()
